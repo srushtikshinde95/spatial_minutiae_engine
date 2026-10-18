@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AFIS-MK4 // SPATIAL MINUTIAE-GRAPH INDEXING ENGINE</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="forensic-theme">
+  <!-- Top Forensic Navigation / Status Bar -->
+  <header class="workstation-header">
+    <div class="header-left">
+      <div class="afis-badge">
+        <span class="badge-icon">&#9670;</span>
+        <span class="badge-title">AFIS-MK4 / FORENSIC LATENT PRINT WORKSTATION</span>
+      </div>
+      <div class="system-tag">SPATIAL MINUTIAE-GRAPH C11 INDEX ENGINE // ROTATION &amp; TRANSLATION INVARIANT</div>
+    </div>
+
+    <div class="header-center">
+      <div class="telemetry-pill">
+        <span class="pill-label">ARCH:</span>
+        <span class="pill-value text-cyan">C11 -O3 (ZERO-LEAK)</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="pill-label">RECORD BUDGET:</span>
+        <span class="pill-value text-emerald">&lt; 1024 B / RECORD</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="pill-label">PRECISION TIMER:</span>
+        <span class="pill-value text-amber">SUB-MICROSECOND QPC</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button id="btn-open-enroll" class="btn btn-emerald">
+        <span class="btn-icon">&#10010;</span> ENROLL NEW LATENT PRINT
+      </button>
+      <button id="btn-open-rotation-mode" class="btn btn-cyan">
+        <span class="btn-icon">&#8635;</span> ROTATED MATCH VERIFICATION MODE
+      </button>
+      <button id="btn-run-benchmark" class="btn btn-amber">
+        <span class="btn-icon">&#9881;</span> BENCHMARK
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workstation Layout -->
+  <main class="workstation-grid">
+    
+    <!-- LEFT PANEL: Latent Print Inspector View -->
+    <section class="panel panel-inspector">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="panel-icon">&#9783;</span>
+          <h2>LATENT PRINT INSPECTOR VIEW</h2>
+        </div>
+        <div class="panel-controls">
+          <select id="select-template" class="form-select" title="Select Fingerprint Case Template">
+            <!-- Dynamically populated from SOCOFing database -->
+          </select>
+          <button id="btn-execute-query" class="btn btn-cyan">
+            <span>&#9654;</span> EXECUTE 3-TIER AFIS QUERY
+          </button>
+        </div>
+      </div>
+
+      <div class="viewport-toolbar">
+        <div class="toolbar-group">
+          <span class="toolbar-label">SENSOR VIEW:</span>
+          <button class="tool-btn active" data-view="enhanced">ENHANCED LATENT</button>
+          <button class="tool-btn" data-view="skeleton">RIDGE SKELETONIZATION</button>
+        </div>
+
+        <div class="toolbar-group">
+          <span class="toolbar-label">OVERLAYS:</span>
+          <label class="toggle-control">
+            <input type="checkbox" id="toggle-minutiae" checked>
+            <span>MINUTIAE (RED: END, GREEN: BIF)</span>
+          </label>
+          <label class="toggle-control">
+            <input type="checkbox" id="toggle-graph" checked>
+            <span>INVARIANT GRAPH EDGES</span>
+          </label>
+          <label class="toggle-control">
+            <input type="checkbox" id="toggle-orientation" checked>
+            <span>ORIENTATION (&theta;)</span>
+          </label>
+          <label class="toggle-control">
+            <input type="checkbox" id="toggle-grid" checked>
+            <span>SPATIAL GRID</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Latent Minutiae Plotter Canvas Container -->
+      <div class="canvas-viewport" id="canvas-viewport">
+        <canvas id="latent-canvas" width="576" height="750"></canvas>
+        <div class="crosshair-indicator" id="crosshair-info">
+          COORD: (X: <span id="ch-x">0</span>, Y: <span id="ch-y">0</span>) | MINUTIAE: <span id="ch-type">NONE</span>
+        </div>
+        <div class="reticle top-left"></div>
+        <div class="reticle top-right"></div>
+        <div class="reticle bottom-left"></div>
+        <div class="reticle bottom-right"></div>
+      </div>
+
+      <div class="inspector-footer">
+        <div class="spec-block">
+          <span class="spec-label">CASE IDENTIFIER:</span>
+          <span class="spec-value text-cyan" id="spec-id">--</span>
+        </div>
+        <div class="spec-block">
+          <span class="spec-label">HENRY PATTERN CLASS:</span>
+          <span class="spec-value text-amber" id="spec-pattern">--</span>
+        </div>
+        <div class="spec-block">
+          <span class="spec-label">EXTRACTED MINUTIAE:</span>
+          <span class="spec-value text-emerald" id="spec-minutiae">--</span>
+        </div>
+        <div class="spec-block">
+          <span class="spec-label">RAW VECTOR BUDGET:</span>
+          <span class="spec-value text-cyan" id="spec-bytes">&lt; 1024 B</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT SPLIT: Top Terminal Console, Bottom Metrics & Match Matrix -->
+    <div class="right-column">
+      
+      <!-- TOP RIGHT: Multi-Tier Search Execution Console -->
+      <section class="panel panel-console">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon">&#9638;</span>
+            <h2>MULTI-TIER SEARCH EXECUTION CONSOLE</h2>
+          </div>
+          <div class="console-actions">
+            <span class="console-badge">STDIN / STDOUT STREAM</span>
+            <button id="btn-clear-console" class="btn-mini">CLEAR</button>
+          </div>
+        </div>
+
+        <div class="console-terminal" id="console-terminal">
+          <div class="term-line info">[SYS_INIT] Spatial Minutiae-Graph Indexing Engine v4.2.0 initialized.</div>
+          <div class="term-line info">[LOAD_PASS] Ingested Kaggle SOCOFing templates into RAM. Zero memory leaks.</div>
+          <div class="term-line prompt">AFIS:~$ Ready for Latent Minutiae Plotter execution...</div>
+        </div>
+      </section>
+
+      <!-- BOTTOM RIGHT: Benchmark Metrics Panel & Candidate Matrix -->
+      <section class="panel panel-metrics">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon">&#9640;</span>
+            <h2>BENCHMARK METRICS &amp; CANDIDATE MATCH MATRIX</h2>
+          </div>
+          <div class="metrics-timestamp">
+            TIMER CLOCK: <span id="bench-timer-clock">0.00 &mu;s</span>
+          </div>
+        </div>
+
+        <!-- 3-Tier Metrics Cards -->
+        <div class="metrics-cards-grid">
+          <div class="metric-card">
+            <div class="card-title">TIER-1 B-TREE PASS</div>
+            <div class="card-main-val text-cyan" id="m-tier1-hops">1 HOPS</div>
+            <div class="card-sub-val" id="m-tier1-prune">PRUNED: 0.00%</div>
+            <div class="card-latency" id="m-tier1-time">LATENCY: 0.00 &mu;s</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="card-title">TIER-2 KD-TREE MATRIX</div>
+            <div class="card-main-val text-emerald" id="m-tier2-hops">0 HOPS</div>
+            <div class="card-sub-val" id="m-tier2-pruned">BRANCHES PRUNED: 0</div>
+            <div class="card-latency" id="m-tier2-time">LATENCY: 0.00 &mu;s</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="card-title">TIER-3 GRAPH INVARIANCE</div>
+            <div class="card-main-val text-amber" id="m-tier3-edges">0 EDGES</div>
+            <div class="card-sub-val" id="m-tier3-eval">CHECKED: 0 EDGES</div>
+            <div class="card-latency" id="m-tier3-time">LATENCY: 0.00 &mu;s</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="card-title">TOTAL EXECUTION TIME</div>
+            <div class="card-main-val text-white" id="m-total-time">0.00 &mu;s</div>
+            <div class="card-sub-val text-cyan" id="m-ram-footprint">RAM: 0.00 KB</div>
+            <div class="card-latency text-emerald" id="m-per-record">ALLOC: &lt; 1 KB/REC</div>
+          </div>
+        </div>
+
+        <!-- Candidate Match Table -->
+        <div class="table-container">
+          <table class="forensic-table" id="candidates-table">
+            <thead>
+              <tr>
+                <th>RANK</th>
+                <th>EXEMPLAR IDENTIFIER</th>
+                <th>CLASS</th>
+                <th>FORENSIC SCORE</th>
+                <th>MINUTIAE MATCH</th>
+                <th>EDGE MATCH</th>
+                <th>SPATIAL RMSE</th>
+                <th>ROTATION (&theta;)</th>
+                <th>TRANSLATION</th>
+                <th>LATENCY</th>
+              </tr>
+            </thead>
+            <tbody id="candidates-tbody">
+              <tr>
+                <td colspan="10" class="empty-state">No search executed. Click 'EXECUTE 3-TIER AFIS QUERY' to initiate search.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: LIVE USER FINGERPRINT ENROLLMENT                                   -->
+  <!-- ========================================================================= -->
+  <div class="modal-overlay hidden" id="enrollment-modal">
+    <div class="modal-window modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="text-emerald">&#10010;</span> ENROLL NEW LATENT PRINT // C DATA ENGINE INGESTION
+        </div>
+        <button class="modal-close" id="btn-close-enroll">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="enroll-layout">
+          <!-- Left: Controls & Metadata -->
+          <div class="enroll-controls">
+            <div class="form-group">
+              <label class="form-label">CASE IDENTIFIER / NAME:</label>
+              <input type="text" id="enroll-case-id" class="form-input" placeholder="e.g. USER_LATENT_01" value="USER_LATENT_01">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">SELECT PRINT IMAGE (.PNG / .BMP / .JPG):</label>
+              <div class="file-dropzone" id="dropzone">
+                <span class="dropzone-icon">&#128194;</span>
+                <span class="dropzone-text">Click or Drag &amp; Drop Fingerprint Scan</span>
+                <input type="file" id="enroll-file-input" accept="image/*" class="file-hidden">
+              </div>
+            </div>
+
+            <div class="enroll-diagnostics-card" id="enroll-preview-meta">
+              <div class="meta-row">
+                <span class="text-muted">PATTERN CLASS:</span>
+                <strong id="meta-pattern" class="text-amber">NOT EXTRACTED</strong>
+              </div>
+              <div class="meta-row">
+                <span class="text-muted">MINUTIAE DETECTED:</span>
+                <strong id="meta-count" class="text-emerald">0 POINTS</strong>
+              </div>
+              <div class="meta-row">
+                <span class="text-muted">ENDINGS / BIFURCATIONS:</span>
+                <span id="meta-breakdown" class="text-dim">0 END / 0 BIF</span>
+              </div>
+              <div class="meta-row">
+                <span class="text-muted">RAW VECTOR SIZE:</span>
+                <strong id="meta-bytes" class="text-cyan">&lt; 1024 BYTES</strong>
+              </div>
+            </div>
+
+            <button id="btn-commit-enrollment" class="btn btn-emerald btn-block" disabled>
+              <span>&#10004;</span> COMMIT ENROLLMENT TO LIVE RAM INDEX
+            </button>
+          </div>
+
+          <!-- Right: Enrollment Latent View Canvas -->
+          <div class="enroll-canvas-box">
+            <div class="canvas-tag">ENROLLMENT LATENT VIEW (MINUTIAE OVERLAY)</div>
+            <canvas id="enroll-canvas" width="288" height="375"></canvas>
+            <div class="enroll-legend">
+              <span class="legend-item"><span class="dot-red"></span> Ridge Ending</span>
+              <span class="legend-item"><span class="dot-green"></span> Bifurcation</span>
+              <span class="legend-item"><span class="line-cyan"></span> Invariant Edge</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ROTATED MATCH VERIFICATION MODE (SPLIT-SCREEN)                     -->
+  <!-- ========================================================================= -->
+  <div class="modal-overlay hidden" id="rotation-modal">
+    <div class="modal-window modal-xl">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="text-cyan">&#8635;</span> ROTATED MATCH VERIFICATION MODE // RELATIVE GRAPH TOPOLOGY
+        </div>
+        <button class="modal-close" id="btn-close-rotation">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Interactive Rotation Slider & Presets Toolbar -->
+        <div class="rotation-toolbar">
+          <div class="rot-control-group">
+            <label class="form-label">TEST EXEMPLAR:</label>
+            <select id="rot-select-template" class="form-select">
+              <!-- Populated from templates -->
+            </select>
+          </div>
+
+          <div class="rot-control-group slider-group">
+            <label class="form-label">SIMULATE SENSOR ROTATION ANGLE: <strong id="rot-angle-val" class="text-amber">+35.0&deg;</strong></label>
+            <input type="range" id="rot-slider" min="-180" max="180" step="5" value="35" class="range-slider">
+          </div>
+
+          <div class="rot-control-group presets-group">
+            <span class="form-label">PRESETS:</span>
+            <button class="preset-btn" data-angle="15">+15&deg;</button>
+            <button class="preset-btn active" data-angle="35">+35&deg;</button>
+            <button class="preset-btn" data-angle="45">+45&deg;</button>
+            <button class="preset-btn" data-angle="90">+90&deg;</button>
+            <button class="preset-btn" data-angle="180">+180&deg;</button>
+            <button class="preset-btn" data-angle="-45">-45&deg;</button>
+          </div>
+
+          <button id="btn-run-rotation-test" class="btn btn-cyan">
+            <span>&#9654;</span> VERIFY INVARIANCE
+          </button>
+        </div>
+
+        <!-- Split-Screen Viewport -->
+        <div class="split-viewport-container">
+          <div class="split-viewport-box">
+            <div class="box-tag text-cyan">ORIGINAL ENROLLED EXEMPLAR: <span id="rot-orig-id">--</span></div>
+            <canvas id="canvas-split-orig" width="360" height="468"></canvas>
+          </div>
+
+          <!-- Connecting correspondence overlay canvas -->
+          <canvas id="canvas-split-connector" width="160" height="468" class="split-connector-canvas"></canvas>
+
+          <div class="split-viewport-box">
+            <div class="box-tag text-amber">ROTATED QUERY SCAN: <span id="rot-query-id">--</span></div>
+            <canvas id="canvas-split-rot" width="360" height="468"></canvas>
+          </div>
+        </div>
+
+        <!-- Live Telemetry Readout & Terminal Bar -->
+        <div class="rotation-live-console">
+          <div class="live-console-header">
+            <span class="dot-live"></span>
+            <span>TOPOLOGICAL INVARIANCE VERIFICATION FEED</span>
+          </div>
+          <div class="live-terminal-line text-emerald" id="rot-term-output">
+            Relative Topology Verification Passed | Rotation Angle Delta Detected: -35.02&deg; | Search Latency: 276.90 &mu;s
+          </div>
+        </div>
+
+        <div class="rotation-metrics-footer">
+          <div class="rot-metric-tile">
+            <span class="tile-label">TOPOLOGICAL STATUS:</span>
+            <strong class="tile-val text-emerald" id="rot-stat-top">CONGRUENT MATCH</strong>
+          </div>
+          <div class="rot-metric-tile">
+            <span class="tile-label">INJECTED ROTATION:</span>
+            <strong class="tile-val text-amber" id="rot-stat-inj">+35.00&deg;</strong>
+          </div>
+          <div class="rot-metric-tile">
+            <span class="tile-label">DETECTED INVERSE DELTA:</span>
+            <strong class="tile-val text-cyan" id="rot-stat-det">-35.02&deg;</strong>
+          </div>
+          <div class="rot-metric-tile">
+            <span class="tile-label">SPATIAL RMSE:</span>
+            <strong class="tile-val text-emerald" id="rot-stat-rmse">0.04 px</strong>
+          </div>
+          <div class="rot-metric-tile">
+            <span class="tile-label">TIER-3 LATENCY:</span>
+            <strong class="tile-val text-white" id="rot-stat-lat">320.40 &mu;s</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Dual Comparison Modal -->
+  <div class="modal-overlay hidden" id="comparison-modal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="text-cyan">&#9737;</span> FORENSIC DUAL-EXEMPLAR COMPARISON INSPECTOR
+        </div>
+        <button class="modal-close" id="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="dual-viewport">
+          <div class="viewport-box">
+            <div class="box-title">QUERY LATENT PRINT: <span id="cmp-query-id" class="text-cyan">--</span></div>
+            <canvas id="cmp-query-canvas" width="288" height="375"></canvas>
+          </div>
+          <div class="viewport-box">
+            <div class="box-title">MATCHED EXEMPLAR: <span id="cmp-match-id" class="text-emerald">--</span></div>
+            <canvas id="cmp-match-canvas" width="288" height="375"></canvas>
+          </div>
+        </div>
+        <div class="modal-diagnostics" id="cmp-diagnostics">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
